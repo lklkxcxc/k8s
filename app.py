@@ -2,7 +2,9 @@
 # pip3 install kubernetes==18.20.0
 # [参考]('https://github.com/kubernetes-client/python/tree/release-18.0/examples')
 from ast import Delete
+from curses import keyname
 import datetime
+from multiprocessing.sharedctypes import Value
 from tkinter import N
 import pytz
 import yaml
@@ -171,7 +173,10 @@ client.V1Container(   #定义容器内容
 	    )
 
 
-def create_destinationrule(gray=False):
+def create_destinationrule(name,namespace,*version,gray=False):
+    '''
+参数说明:version为可变参数提供服务version元祖，("v1","v2")
+'''
     dest_yaml = '''
 apiVersion: networking.istio.io/v1beta1
 kind: DestinationRule 
@@ -189,19 +194,24 @@ spec:
     name: name            
 '''
     dest_yaml = yaml.load(dest_yaml, Loader=yaml.FullLoader)
-    dest_yaml["metadata"]["name"] = "nginx"
-    dest_yaml["metadata"]["namespace"] = "default"
-    dest_yaml["metadata"]["labels"]["app"] = "nginx"
-    dest_yaml["metadata"]["labels"]["app.kubernetes.io/name"] = "nginx"
-    dest_yaml["spec"]["host"] = "nginx"
-    dest_yaml["spec"]["subsets"][0]["labels"]["version"] = "v1"
-    dest_yaml["spec"]["subsets"][0]["name"] = "nginx-v1"
+    dest_yaml["metadata"]["name"] = name
+    dest_yaml["metadata"]["namespace"] = namespace
+    dest_yaml["metadata"]["labels"]["app"] = name
+    dest_yaml["metadata"]["labels"]["app.kubernetes.io/name"] = name
+    dest_yaml["spec"]["host"] = name
+    dest_yaml["spec"]["subsets"][0]["labels"]["version"] = version[0]
+    dest_yaml["spec"]["subsets"][0]["name"] = name+'-'+version[0]
     if gray == True:
-        dest_yaml.update({"spec":{"subsets":[{"labels":{"version":"v1"},"name":"nginx-v1"},{"labels":{"version":"v2"},"name":"nginx-v2"}]}})
+        dest_yaml.update({"spec":{"host":name,"subsets":[{"labels":{"version":version[0]},"name":name+'-'+version[0]},{"labels":{"version":version[1]},"name":name+'-'+version[1]}]}})
     with open("dest.yml", "w") as f:
         yaml.dump(dest_yaml, f)   
 
-def create_virtualservicerule(gray=False):
+def create_virtualservicerule(name,namespace,expose_port,gray=False,**rule):
+    '''
+参数说明：rule参数正常模式version=version 最终函数获取的变量值：{"version":"v1"}
+canary模式下： name_version2={"header-key":"header-value"},old_version=name_version1  最终函数获取到的变量值：{"name_version2":{"header-key":"header-value"},"old_version":"name-version1":"}
+blue模式下：name_version1=weight1,name_version2=weight2 最终函数获取到的变量值：{"name_version1":"weight1","name_version2":"weight2"}
+'''
     virtualsvc_yaml = '''
 apiVersion: networking.istio.io/v1beta1
 kind: VirtualService
@@ -227,21 +237,24 @@ spec:
       weight: 100
 '''
     virtualsvc_yaml = yaml.load(virtualsvc_yaml, Loader=yaml.FullLoader)
-    virtualsvc_yaml["metadata"]["name"] = "nginx"
-    virtualsvc_yaml["metadata"]["namespace"] = "default"
-    virtualsvc_yaml["metadata"]["labels"]["app"] = "nginx"
-    virtualsvc_yaml["metadata"]["labels"]["app.kubernetes.io/name"] = "nginx"
-    virtualsvc_yaml["spec"]["hosts"][0] = "nginx"
-    virtualsvc_yaml["spec"]["tcp"][0]["match"][0]["port"] = 80
-    virtualsvc_yaml["spec"]["tcp"][0]["route"][0]["destination"]["host"] = "nginx"
-    virtualsvc_yaml["spec"]["tcp"][0]["route"][0]["destination"]["port"]["number"] = 80
-    virtualsvc_yaml["spec"]["tcp"][0]["route"][0]["destination"]["subset"] = "nginx-v1"
-    virtualsvc_yaml["spec"]["tcp"][0]["route"][0]["weight"] = 100
+    virtualsvc_yaml["metadata"]["name"] = name
+    virtualsvc_yaml["metadata"]["namespace"] = namespace
+    virtualsvc_yaml["metadata"]["labels"]["app"] = name
+    virtualsvc_yaml["metadata"]["labels"]["app.kubernetes.io/name"] = name
+    virtualsvc_yaml["spec"]["hosts"][0] = name
+    if gray == True:
+        virtualsvc_yaml["spec"]["tcp"][0]["match"][0]["port"] = expose_port
+        virtualsvc_yaml["spec"]["tcp"][0]["route"][0]["destination"]["host"] = name
+        virtualsvc_yaml["spec"]["tcp"][0]["route"][0]["destination"]["port"]["number"] = expose_port
+        virtualsvc_yaml["spec"]["tcp"][0]["route"][0]["destination"]["subset"] = name+'-'+rule['version']
+        virtualsvc_yaml["spec"]["tcp"][0]["route"][0]["weight"] = 100
     if gray == "canary":
         del virtualsvc_yaml["spec"]["tcp"]
-        virtualsvc_yaml.update({'spec': {'hosts': ['nginx'], 'http': [{'match': [{'headers': {'end-user': {'exact': 'jason'}}}], 'route': [{'destination': {'host': 'nginx', 'subset': 'nginx-v2'}}]}, {'route': [{'destination': {'host': 'nginx', 'subset': 'nginx-v1'}}]}]}})
+        header_key = list(rule[list(rule.keys())[0]].keys())[0]
+        header_value = rule[list(rule.keys())[0]][header_key]
+        virtualsvc_yaml.update({'spec': {'hosts': [name], 'http': [{'match': [{'headers': {header_key: {'exact': header_value}}}], 'route': [{'destination': {'host': name, 'subset': list(rule.keys())[0].replace('_','-')}}]}, {'route': [{'destination': {'host': name, 'subset': rule['old_version'].replace('_','-')}}]}]}})
     elif gray == "blue":
-        virtualsvc_yaml.update({'spec': {'hosts': ['nginx'], 'http': [], 'tcp': [{'match': [{'port': 80}], 'route': [{'destination': {'host': 'nginx', 'port': {'number': 80}, 'subset': 'nginx-v1'}, 'weight': 80}, {'destination': {'host': 'name', 'port': {'number': 80}, 'subset': 'nginx-v2'}, 'weight': 20}]}]}})
+        virtualsvc_yaml.update({'spec': {'hosts': [name], 'http': [], 'tcp': [{'match': [{'port': expose_port}], 'route': [{'destination': {'host': name, 'port': {'number': expose_port}, 'subset': list(rule.keys())[0].replace('_','-')}, 'weight': rule[list(rule.keys())[0]]}, {'destination': {'host': name, 'port': {'number': expose_port}, 'subset': list(rule.keys())[1].replace('_','-')}, 'weight': rule[list(rule.keys())[1]]}]}]}})
     else:
         pass
     with open("virtualsvc.yml", "w") as f:
@@ -301,8 +314,8 @@ def delete_virtualservice(k8s_client):
 
 config.load_kube_config()
 #提交自定义CRD，比如istio等第三方API
-dest_yaml = create_destinationrule(gray=True)
-virtualsvc_yaml = create_virtualservicerule(gray="canary")
+dest_yaml = create_destinationrule("nginx","default","v1","v2",gray=True)
+virtualsvc_yaml = create_virtualservicerule("nginx","default",80,gray="canary",nginx_v2={"end-user":"jason"},old_version="nginx_v1")
 k8s_client = dynamic.DynamicClient(
     client.api_client.ApiClient()
 )
@@ -318,7 +331,7 @@ create_app = App(apps_v1,"nginx","default",80,"v2")
 #create_app.create_deployment_object("harbor.cechealth.cn/tools/nginx:1.20.1",1,'resources=client.V1ResourceRequirements(requests={"cpu": "500m", "memory": "512Mi"},limits={"cpu": "1000m", "memory": "1024Mi"},),volume_mounts=[client.V1VolumeMount(mount_path="/var/log/nginx",name="log",)],liveness_probe=client.V1Probe(tcp_socket=client.V1TCPSocketAction(port=80),initial_delay_seconds=45,period_seconds=10,failure_threshold=3),readiness_probe=client.V1Probe(tcp_socket=client.V1TCPSocketAction(port=80),initial_delay_seconds=45,period_seconds=10,failure_threshold=3)',volume_name="log",nfs_ip="172.16.56.225",nfs_path="/nfs/storage-class/log",mount_path="/var/log/nginx")
 #create_app.create_deployment()
 #create_app.create_service()
-create_app.create_ingress(networking_v1_beta1_api)
+#create_app.create_ingress(networking_v1_beta1_api)
 
 
 if __name__ == '__main__':
