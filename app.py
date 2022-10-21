@@ -144,7 +144,8 @@ client.V1Container(   #定义容器内容
 	        api_version="networking.k8s.io/v1beta1",
 	        kind="Ingress",
 	        metadata=client.V1ObjectMeta(name=self.name, annotations={
-	            "nginx.ingress.kubernetes.io/rewrite-target": "/"
+	            "nginx.ingress.kubernetes.io/rewrite-target": "/","nginx.ingress.kubernetes.io/upstream-vhost": self.name+"."+self.namespace+".svc.cluster.local"
+
 	        }),
 	        spec=client.NetworkingV1beta1IngressSpec(
 	            rules=[client.NetworkingV1beta1IngressRule(
@@ -311,13 +312,13 @@ create_virtualservice(k8s_client)
 
 # k8s标准API提交
 apps_v1 = client.AppsV1Api() 
-#networking_v1_beta1_api = client.NetworkingV1beta1Api()                                                                     
+networking_v1_beta1_api = client.NetworkingV1beta1Api()                                                                     
 create_app = App(apps_v1,"nginx","default",80,"v2")
 #自定义pod属性：resources=client.V1ResourceRequirements(requests={"cpu": "500m", "memory": "512Mi"},limits={"cpu": "1000m", "memory": "1024Mi"},),volume_mounts=[client.V1VolumeMount(mount_path="/var/log/nginx",name="log",)],liveness_probe=client.V1Probe(tcp_socket=client.V1TCPSocketAction(port=80),initial_delay_seconds=45,period_seconds=10,failure_threshold=3),readiness_probe=client.V1Probe(tcp_socket=client.V1TCPSocketAction(port=80),initial_delay_seconds=45,period_seconds=10,failure_threshold=3)
-create_app.create_deployment_object("harbor.cechealth.cn/tools/nginx:1.20.1",1,'resources=client.V1ResourceRequirements(requests={"cpu": "500m", "memory": "512Mi"},limits={"cpu": "1000m", "memory": "1024Mi"},),volume_mounts=[client.V1VolumeMount(mount_path="/var/log/nginx",name="log",)],liveness_probe=client.V1Probe(tcp_socket=client.V1TCPSocketAction(port=80),initial_delay_seconds=45,period_seconds=10,failure_threshold=3),readiness_probe=client.V1Probe(tcp_socket=client.V1TCPSocketAction(port=80),initial_delay_seconds=45,period_seconds=10,failure_threshold=3)',volume_name="log",nfs_ip="172.16.56.225",nfs_path="/nfs/storage-class/log",mount_path="/var/log/nginx")
-create_app.create_deployment()
+#create_app.create_deployment_object("harbor.cechealth.cn/tools/nginx:1.20.1",1,'resources=client.V1ResourceRequirements(requests={"cpu": "500m", "memory": "512Mi"},limits={"cpu": "1000m", "memory": "1024Mi"},),volume_mounts=[client.V1VolumeMount(mount_path="/var/log/nginx",name="log",)],liveness_probe=client.V1Probe(tcp_socket=client.V1TCPSocketAction(port=80),initial_delay_seconds=45,period_seconds=10,failure_threshold=3),readiness_probe=client.V1Probe(tcp_socket=client.V1TCPSocketAction(port=80),initial_delay_seconds=45,period_seconds=10,failure_threshold=3)',volume_name="log",nfs_ip="172.16.56.225",nfs_path="/nfs/storage-class/log",mount_path="/var/log/nginx")
+#create_app.create_deployment()
 #create_app.create_service()
-#create_app.create_ingress(networking_v1_beta1_api)
+create_app.create_ingress(networking_v1_beta1_api)
 
 
 if __name__ == '__main__':
