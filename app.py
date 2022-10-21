@@ -25,7 +25,7 @@ client.V1Container(   #定义容器内容
     name=self.name,                                                                                              
     image=image,                                                                                 
     ports=[client.V1ContainerPort(container_port=self.expose_port)],
-    '''+options[0]+'''
+    '''+options[0]+'''  #options 为pod属性设置比如liveness,volumemount等
 )
 '''
         container = eval(object)
@@ -175,7 +175,7 @@ client.V1Container(   #定义容器内容
 
 def create_destinationrule(name,namespace,*version,gray=False):
     '''
-参数说明:version为可变参数提供服务version元祖，("v1","v2")
+参数说明:version为可变参数提供服务version元祖，("v1","v2"),举例：("nginx","default","v1","v2",gray=True)
 '''
     dest_yaml = '''
 apiVersion: networking.istio.io/v1beta1
@@ -208,9 +208,9 @@ spec:
 
 def create_virtualservicerule(name,namespace,expose_port,gray=False,**rule):
     '''
-参数说明：rule参数正常模式version=version 最终函数获取的变量值：{"version":"v1"}
-canary模式下： name_version2={"header-key":"header-value"},old_version=name_version1  最终函数获取到的变量值：{"name_version2":{"header-key":"header-value"},"old_version":"name-version1":"}
-blue模式下：name_version1=weight1,name_version2=weight2 最终函数获取到的变量值：{"name_version1":"weight1","name_version2":"weight2"}
+参数说明：rule参数正常模式version=version 最终函数获取的变量值：{"version":"v1"}，举例：("nginx","default",80,version="v1")
+canary模式下： name_version2={"header-key":"header-value"},old_version=name_version1  最终函数获取到的变量值：{"name_version2":{"header-key":"header-value"},"old_version":"name-version1":"},举例：("nginx","default",80,gray="canary",nginx_v2={"end-user":"jason"},old_version="nginx_v1")
+blue模式下：name_version1=weight1,name_version2=weight2 最终函数获取到的变量值：{"name_version1":"weight1","name_version2":"weight2"}，举例：("nginx","default",80,nginx_v2=20,nginx_v1=80)
 '''
     virtualsvc_yaml = '''
 apiVersion: networking.istio.io/v1beta1
