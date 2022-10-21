@@ -1,11 +1,7 @@
 #!/Library/Frameworks/Python.framework/Versions/3.10/bin/python3
 # pip3 install kubernetes==18.20.0
 # [参考]('https://github.com/kubernetes-client/python/tree/release-18.0/examples')
-from ast import Delete
-from curses import keyname
 import datetime
-from multiprocessing.sharedctypes import Value
-from tkinter import N
 import pytz
 import yaml
 from kubernetes import client, config,utils,dynamic
