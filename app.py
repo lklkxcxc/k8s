@@ -274,12 +274,24 @@ def apply_simple_item(dynamic_client: dynamic.DynamicClient, manifest: dict, ver
         if verbose:
             print(f"{namespace}/{resource_name} created")
 
-def delete_simple_item(dynamic_client: dynamic.DynamicClient, manifest: dict, verbose: bool=False):
-    api_version = "networking.istio.io/v1beta1"
-    kind = "VirtualService"
+def get_simple_item(name,namespace,dynamic_client: dynamic.DynamicClient, manifest: dict, verbose: bool=False):
+    api_version = manifest.get("apiVersion")
+    kind = manifest.get("kind")
     crd_api = dynamic_client.resources.get(api_version=api_version, kind=kind)
-    namespace = "default"
-    name = "nginx"
+    try:
+        crd_api.get(namespace=namespace, name=name)
+        if verbose:
+            return True
+            print(f"{namespace}/{resource_name} is exist")
+    except dynamic.exceptions.NotFoundError:
+        return False
+        print(f"{namespace}/{resource_name} no exist")
+
+
+def delete_simple_item(name,namespace,dynamic_client: dynamic.DynamicClient, manifest: dict, verbose: bool=False):
+    api_version = manifest.get("apiVersion")
+    kind = manifest.get("kind")
+    crd_api = dynamic_client.resources.get(api_version=api_version, kind=kind)
     crd_api.get(namespace=namespace, name=name)
     crd_api.delete(namespace=namespace, name=name)
     print(f"{namespace}/{name} delete")
@@ -291,10 +303,15 @@ def apply_simple_item_from_yaml(dynamic_client: dynamic.DynamicClient, filepath:
         manifest = yaml.safe_load(f)
         apply_simple_item(dynamic_client=dynamic_client, manifest=manifest, verbose=verbose)
 
-def delete_simple_item_from_yaml(dynamic_client: dynamic.DynamicClient, filepath: pathlib.Path, verbose: bool=False):
+def get_simple_item_from_yaml(name,namespace,dynamic_client: dynamic.DynamicClient, filepath: pathlib.Path, verbose: bool=False):
     with open(filepath, 'r') as f:
         manifest = yaml.safe_load(f)
-        delete_simple_item(dynamic_client=dynamic_client, manifest=manifest, verbose=verbose)
+        get_simple_item(name,namespace,dynamic_client=dynamic_client, manifest=manifest, verbose=verbose)
+
+def delete_simple_item_from_yaml(name,namespace,dynamic_client: dynamic.DynamicClient, filepath: pathlib.Path, verbose: bool=False):
+    with open(filepath, 'r') as f:
+        manifest = yaml.safe_load(f)
+        delete_simple_item(name,namespace,dynamic_client=dynamic_client, manifest=manifest, verbose=verbose)
 
 def create_destination(k8s_client):
     yaml_file = 'dest.yml'
@@ -304,9 +321,13 @@ def create_virtualservice(k8s_client):
     yaml_file = 'virtualsvc.yml'
     apply_simple_item_from_yaml(k8s_client,yaml_file,verbose=True)
 
-def delete_virtualservice(k8s_client):
-    yaml_file = 'virtualsvc-d.yml'
-    delete_simple_item_from_yaml(k8s_client,yaml_file,verbose=True)
+def get_virtualservice(k8s_client,name,namespace):
+    yaml_file = 'virtualsvc.yml'
+    get_simple_item_from_yaml(name,namespace,k8s_client,yaml_file,verbose=True)
+
+def delete_virtualservice(k8s_client,name,namespace):
+    yaml_file = 'virtualsvc.yml'
+    delete_simple_item_from_yaml(name,namespace,k8s_client,yaml_file,verbose=True)
 
 config.load_kube_config()
 #提交自定义CRD，比如istio等第三方API
@@ -316,7 +337,8 @@ k8s_client = dynamic.DynamicClient(
     client.api_client.ApiClient()
 )
 create_destination(k8s_client)
-delete_virtualservice(k8s_client)
+if get_virtualservice(k8s_client,"nginx","default"):
+    delete_virtualservice(k8s_client,"nginx","default")
 create_virtualservice(k8s_client)
 
 # k8s标准API提交
