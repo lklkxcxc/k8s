@@ -1,0 +1,16 @@
+apiVersion: networking.istio.io/v1beta1
+kind: DestinationRule
+metadata:
+  labels:
+    app: nginx
+    app.kubernetes.io/name: nginx
+  name: nginx
+  namespace: default
+spec:
+  subsets:
+  - labels:
+      version: v1
+    name: nginx-v1
+  - labels:
+      version: v2
+    name: nginx-v2

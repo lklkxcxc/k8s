@@ -1,0 +1,24 @@
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  labels:
+    app: nginx
+    app.kubernetes.io/name: nginx
+  name: nginx
+  namespace: default
+spec:
+  hosts:
+  - nginx
+  http:
+  - match:
+    - headers:
+        end-user:
+          exact: jason
+    route:
+    - destination:
+        host: nginx
+        subset: nginx-v2
+  - route:
+    - destination:
+        host: nginx
+        subset: nginx-v1

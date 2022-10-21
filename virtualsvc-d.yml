@@ -1,0 +1,9 @@
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  labels:
+    app: nginx
+    app.kubernetes.io/name: nginx
+  name: nginx
+  namespace: default
+
