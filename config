@@ -7,43 +7,76 @@ import yaml
 from kubernetes import client, config,utils,dynamic
 import pathlib
 
+def envs_config(env_dict):
+#env_dict={"port":8080}
+    envs_config = []
+    for k,v in env_dict.items():
+        env="client.V1EnvVar(name="+k+",value="+str(v)+")"
+        envs_config.append(env)
+    envs_config = "["+','.join(envs_config)+"]"
+    return envs_config
+
+
 def health_check_config(initial_delay_seconds,period_seconds,failure_threshold,**type):
-    # **type(_exec,tcp_socket,http_get)三种检查方式,变量type=_exec,command=command等于{"type":"_exec","command":"command"},当：type=http_get,port=8080,path=/206-user/actuator/health等价于{"type":"http_get","port":8080,"path:"/206-user/actuator/health"}
+    # **type(_exec,tcp_socket,http_get)三种检查方式,变量type=_exec,command=command等于{"type":"_exec","command":"command"},当：type="http_get",port=8080,path="/206-user/actuator/health"等价于{"type":"http_get","port":8080,"path:"/206-user/actuator/health"}
     if type['type'] == "tcp_socket":
-        liveness_probe="client.V1Probe(tcp_socket=client.V1TCPSocketAction(port="+type['port']+"),initial_delay_seconds="+initial_delay_seconds+",period_seconds="+period_seconds+",failure_threshold="+failure_threshold+")"
-        readiness_probe="client.V1Probe(tcp_socket=client.V1TCPSocketAction(port="+type['port']+"),initial_delay_seconds="+initial_delay_seconds+",period_seconds="+period_seconds+",failure_threshold="+failure_threshold+")"
+        liveness_probe="client.V1Probe(tcp_socket=client.V1TCPSocketAction(port="+str(type['port'])+"),initial_delay_seconds="+str(initial_delay_seconds)+",period_seconds="+str(period_seconds)+",failure_threshold="+str(failure_threshold)+")"
+        readiness_probe="client.V1Probe(tcp_socket=client.V1TCPSocketAction(port="+str(type['port'])+"),initial_delay_seconds="+str(initial_delay_seconds)+",period_seconds="+str(period_seconds)+",failure_threshold="+str(failure_threshold)+")"
     elif type['type'] == "http_get":
-        liveness_probe="client.V1Probe(http_get=client.V1HTTPGetAction(port="+type['port']+",path="+type['path']+"),initial_delay_seconds="+initial_delay_seconds+",period_seconds="+period_seconds+",failure_threshold="+failure_threshold+")"
-        readiness_probe="client.V1Probe(http_get=client.V1HTTPGetAction(port="+type['port']+",path="+type['path']+"),initial_delay_seconds="+initial_delay_seconds+",period_seconds="+period_seconds+",failure_threshold="+failure_threshold+")"
+        liveness_probe="client.V1Probe(http_get=client.V1HTTPGetAction(port="+str(type['port'])+",path="+type['path']+"),initial_delay_seconds="+str(initial_delay_seconds)+",period_seconds="+str(period_seconds)+",failure_threshold="+str(failure_threshold)+")"
+        readiness_probe="client.V1Probe(http_get=client.V1HTTPGetAction(port="+str(type['port'])+",path="+type['path']+"),initial_delay_seconds="+str(initial_delay_seconds)+",period_seconds="+str(period_seconds)+",failure_threshold="+str(failure_threshold)+")"
     else:
-        liveness_probe="client.V1Probe(_exec=client.V1ExecAction(command="+type['command']+"),initial_delay_seconds="+initial_delay_seconds+",period_seconds="+period_seconds+",failure_threshold="+failure_threshold+")"
-        readiness_probe="client.V1Probe(_exec=client.V1ExecAction(command="+type['command']+"),initial_delay_seconds="+initial_delay_seconds+",period_seconds="+period_seconds+",failure_threshold="+failure_threshold+")"
-    health_check_config=(liveness_probe,readiness_probe)
+        liveness_probe="client.V1Probe(_exec=client.V1ExecAction(command="+type['command']+"),initial_delay_seconds="+str(initial_delay_seconds)+",period_seconds="+str(period_seconds)+",failure_threshold="+str(failure_threshold)+")"
+        readiness_probe="client.V1Probe(_exec=client.V1ExecAction(command="+type['command']+"),initial_delay_seconds="+str(initial_delay_seconds)+",period_seconds="+str(period_seconds)+",failure_threshold="+str(failure_threshold)+")"
+    health_check_config=("liveness="+liveness_probe,"readiness="+readiness_probe)
     return health_check_config
 
 def volumes_mount_config(volumes):
-    #volumes=[{"name"="log","mount_path"="/var/log/nginx","read_only"="false"}]
+    #volumes=[{"name":"log","mount_path":"/var/log/nginx","read_only":"false"}]
     volumes_mount = []
     for volume in volumes:
-        volume_mount="client.V1VolumeMount(mount_path="+volume['mount_path']+",name="+volume['name']+","read_only"="+volume['read_only']+")"
+        volume_mount="client.V1VolumeMount(mount_path="+volume['mount_path']+",name="+volume['name']+",read_only="+volume['read_only']+")"
         volumes_mount.append(volume_mount)
+    volumes_mount = "volume_mounts=["+','.join(volumes_mount)+"]"
     return volumes_mount
 
-def volume_config(volume_name,**volume):
-    # **volume(nfs,cephfs,http)支持三种卷,变量type=nfs,nfs_ip="172.16.56.225",nfs_path="/nfs/storage-class/log";type=cephfs,monitors=["172.16.56.225:6789","172.16.56.226:6789"],cephfs_path="/cephfs/k8s-pool,user=admin,secret_ref=ceph-secret"
-    if volume['type'] == "nfs":
-        volume_config = "client.V1PodSpec(containers=[container],volumes=[client.V1Volume(name="+volume_name+",nfs=client.V1NFSVolumeSource(server="+volume['nfs_ip']+",path="+volume['nfs_path']+",))])"
-    elif volume['type'] == "cephfs":
-        volume_config = "client.V1PodSpec(containers=[container],volumes=[client.V1Volume(name="+volume_name+",cephfs=client.V1CephFSVolumeSource(monitors="+volume["monitors"]+",path="+volume['cephfs_path']+",user="+volume['user']+",secret_ref=client.V1LocalObjectReference(name="+volume['secret_ref']+")))])"
-    elif volume['type'] == "glusterfs":
-        volume_config = "client.V1PodSpec(containers=[container],volumes=[client.V1Volume(name="+volume_name+",glusterfs=client.V1GlusterfsVolumeSource(endpoints="+volume["endpoints"]+",path="+volume['glusterfs_path']+"))])" 
-    elif volume['type'] == "host_path":
-        volume_config = "client.V1PodSpec(containers=[container],volumes=[client.V1Volume(name="+volume_name+",glusterfs=client.V1HostPathVolumeSource(path="+volume["path"]+",type="+volume['type']+"))])"       
+def volumes_config(volumes):
+    # **volume(nfs,cephfs,http)支持三种卷,变量[{"type"="nfs","nfs_ip":"172.16.56.225","nfs_path":"/nfs/storage-class/log"},{"type":"cephfs","monitors":["172.16.56.225:6789","172.16.56.226:6789"],"cephfs_path":"/cephfs/k8s-pool","user":"admin","secret_ref":"ceph-secret"}]"
+    volumes_config = []
+    for v in volumes:
+        if v['type'] == "nfs":
+            volume="client.V1Volume(name="+v['name']+",nfs=client.V1NFSVolumeSource(server="+v['nfs_ip']+",path="+v['nfs_path']+",))"
+            volumes_config.append(volume)
+        elif v['type'] == "cephfs":
+            volume="client.V1Volume(name="+v['name']+",cephfs=client.V1CephFSVolumeSource(monitors="+str(v["monitors"])+",path="+v['cephfs_path']+",user="+v['user']+",secret_ref=client.V1LocalObjectReference(name="+v['secret_ref']+")))"
+            volumes_config.append(volume)
+        elif v['type'] == "glusterfs":
+            volume="client.V1Volume(name="+v['name']+",glusterfs=client.V1GlusterfsVolumeSource(endpoints="+str(v["endpoints"])+",path="+v['glusterfs_path']+"))" 
+            volumes_config.append(volume)
+        elif v['type'] == "host_path":
+            volume="client.V1Volume(name="+v['name']+",glusterfs=client.V1HostPathVolumeSource(path="+v["path"]+",type="+v['type']+"))" 
+            volumes_config.append(volume)      
     else:
         print("暂不支持的文件类型")
-        
-    volume_config = (volume_config)
-    return volume_config
+    volumes_config = "volumes=["+','.join(volumes_config)+"]"
+    return volumes_config
 
+#parms = { "EUREKA_HOST": "cluster-registry-eureka.pre.svc.cluster.local", "EUREKA_PORT": 8761, "EUREKA_USERNAME": "akso", "EUREKA_PASSWORD": "akso", "MYSQL_USERNAME": "root", "MYSQL_PASSWORD": "umj8z+p6zDqjoU8y", "MYSQL_HOST": "pre-mysql-proxysql-cluster.pre.svc.cluster.local", "MYSQL_PORT": 3306, "COMMONS_DATABASE_NAME": 206, "MANAGE_DATABASE_NAME": "206-manage", "REDIS_CLUSTER_NODES": "redis-cluster-shard0-announce-0.pre.svc.cluster.local:6379\\\\\,redis-cluster-shard0-announce-1.pre.svc.cluster.local:6379\\\\,redis-cluster-shard1-announce-0.pre.svc.cluster.local:6379\\\\,redis-cluster-shard1-announce-1.pre.svc.cluster.local:6379\\\\,redis-cluster-shard2-announce-0.pre.svc.cluster.local:6379\\\\,redis-cluster-shard2-announce-1.pre.svc.cluster.local:6379", "REDIS_PASSWORD": "Cechealth@2020", "STATIC_PREFIX": "http://", "STATIC_ADDRESS": "206.h5.hxyy.cechealth.cn", "ORAL_CAVITY_SWITCH":"Y", "SW_AGENT_COLLECTOR_BACKEND_SERVICES": "skywalking-oap.monitoring.svc.cluster.local:11800", "SW_AGENT_OPTS": "-javaagent:./agent/skywalking-agent.jar", "SW_AGENT_SPAN_LIMIT": "200" }
+#envs_config = envs_config(parms)
+#print(envs_config)
+
+#volume_config = volumes_config([{"name":"log","type":"cephfs","monitors":["172.16.56.225:6789","172.16.56.226:6789"],"cephfs_path":"/cephfs/k8s-pool","user":"admin","secret_ref":"ceph-secret"}])
+#print(volume_config)
+
+#volumes_mount = volumes_mount_config([{"name":"log","mount_path":"/var/log/nginx","read_only":"false"}])
+#print(volumes_mount)
+
+#health_check = health_check_config(30,10,10,type="http_get",port=8080,path="/206-user/actuator/health")
+#print(health_check)
+
+
+
+if __name__ == '__main__':
+    main()               # 运行主程序
 
     
