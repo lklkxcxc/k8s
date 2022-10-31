@@ -1,0 +1,49 @@
+#!/Library/Frameworks/Python.framework/Versions/3.10/bin/python3
+# pip3 install kubernetes==18.20.0
+# [参考1]('https://github.com/kubernetes-client/python/tree/release-18.0/examples')
+# [参考2]('https://github.com/kubernetes-client/python/blob/release-18.0/kubernetes/docs/V1DeploymentSpec.md')
+import datetime
+import yaml
+from kubernetes import client, config,utils,dynamic
+import pathlib
+
+def health_check_config(initial_delay_seconds,period_seconds,failure_threshold,**type):
+    # **type(_exec,tcp_socket,http_get)三种检查方式,变量type=_exec,command=command等于{"type":"_exec","command":"command"},当：type=http_get,port=8080,path=/206-user/actuator/health等价于{"type":"http_get","port":8080,"path:"/206-user/actuator/health"}
+    if type['type'] == "tcp_socket":
+        liveness_probe="client.V1Probe(tcp_socket=client.V1TCPSocketAction(port="+type['port']+"),initial_delay_seconds="+initial_delay_seconds+",period_seconds="+period_seconds+",failure_threshold="+failure_threshold+")"
+        readiness_probe="client.V1Probe(tcp_socket=client.V1TCPSocketAction(port="+type['port']+"),initial_delay_seconds="+initial_delay_seconds+",period_seconds="+period_seconds+",failure_threshold="+failure_threshold+")"
+    elif type['type'] == "http_get":
+        liveness_probe="client.V1Probe(http_get=client.V1HTTPGetAction(port="+type['port']+",path="+type['path']+"),initial_delay_seconds="+initial_delay_seconds+",period_seconds="+period_seconds+",failure_threshold="+failure_threshold+")"
+        readiness_probe="client.V1Probe(http_get=client.V1HTTPGetAction(port="+type['port']+",path="+type['path']+"),initial_delay_seconds="+initial_delay_seconds+",period_seconds="+period_seconds+",failure_threshold="+failure_threshold+")"
+    else:
+        liveness_probe="client.V1Probe(_exec=client.V1ExecAction(command="+type['command']+"),initial_delay_seconds="+initial_delay_seconds+",period_seconds="+period_seconds+",failure_threshold="+failure_threshold+")"
+        readiness_probe="client.V1Probe(_exec=client.V1ExecAction(command="+type['command']+"),initial_delay_seconds="+initial_delay_seconds+",period_seconds="+period_seconds+",failure_threshold="+failure_threshold+")"
+    health_check_config=(liveness_probe,readiness_probe)
+    return health_check_config
+
+def volumes_mount_config(volumes):
+    #volumes=[{"name"="log","mount_path"="/var/log/nginx","read_only"="false"}]
+    volumes_mount = []
+    for volume in volumes:
+        volume_mount="client.V1VolumeMount(mount_path="+volume['mount_path']+",name="+volume['name']+","read_only"="+volume['read_only']+")"
+        volumes_mount.append(volume_mount)
+    return volumes_mount
+
+def volume_config(volume_name,**volume):
+    # **volume(nfs,cephfs,http)支持三种卷,变量type=nfs,nfs_ip="172.16.56.225",nfs_path="/nfs/storage-class/log";type=cephfs,monitors=["172.16.56.225:6789","172.16.56.226:6789"],cephfs_path="/cephfs/k8s-pool,user=admin,secret_ref=ceph-secret"
+    if volume['type'] == "nfs":
+        volume_config = "client.V1PodSpec(containers=[container],volumes=[client.V1Volume(name="+volume_name+",nfs=client.V1NFSVolumeSource(server="+volume['nfs_ip']+",path="+volume['nfs_path']+",))])"
+    elif volume['type'] == "cephfs":
+        volume_config = "client.V1PodSpec(containers=[container],volumes=[client.V1Volume(name="+volume_name+",cephfs=client.V1CephFSVolumeSource(monitors="+volume["monitors"]+",path="+volume['cephfs_path']+",user="+volume['user']+",secret_ref=client.V1LocalObjectReference(name="+volume['secret_ref']+")))])"
+    elif volume['type'] == "glusterfs":
+        volume_config = "client.V1PodSpec(containers=[container],volumes=[client.V1Volume(name="+volume_name+",glusterfs=client.V1GlusterfsVolumeSource(endpoints="+volume["endpoints"]+",path="+volume['glusterfs_path']+"))])" 
+    elif volume['type'] == "host_path":
+        volume_config = "client.V1PodSpec(containers=[container],volumes=[client.V1Volume(name="+volume_name+",glusterfs=client.V1HostPathVolumeSource(path="+volume["path"]+",type="+volume['type']+"))])"       
+    else:
+        print("暂不支持的文件类型")
+        
+    volume_config = (volume_config)
+    return volume_config
+
+
+    
