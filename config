@@ -61,7 +61,7 @@ def volumes_config(volumes):
     volumes_config = "volumes=["+','.join(volumes_config)+"]"
     return volumes_config
 
-#parms = { "EUREKA_HOST": "cluster-registry-eureka.pre.svc.cluster.local", "EUREKA_PORT": 8761, "EUREKA_USERNAME": "akso", "EUREKA_PASSWORD": "akso", "MYSQL_USERNAME": "root", "MYSQL_PASSWORD": "umj8z+p6zDqjoU8y", "MYSQL_HOST": "pre-mysql-proxysql-cluster.pre.svc.cluster.local", "MYSQL_PORT": 3306, "COMMONS_DATABASE_NAME": 206, "MANAGE_DATABASE_NAME": "206-manage", "REDIS_CLUSTER_NODES": "redis-cluster-shard0-announce-0.pre.svc.cluster.local:6379\\\\\,redis-cluster-shard0-announce-1.pre.svc.cluster.local:6379\\\\,redis-cluster-shard1-announce-0.pre.svc.cluster.local:6379\\\\,redis-cluster-shard1-announce-1.pre.svc.cluster.local:6379\\\\,redis-cluster-shard2-announce-0.pre.svc.cluster.local:6379\\\\,redis-cluster-shard2-announce-1.pre.svc.cluster.local:6379", "REDIS_PASSWORD": "Cechealth@2020", "STATIC_PREFIX": "http://", "STATIC_ADDRESS": "206.h5.hxyy.cechealth.cn", "ORAL_CAVITY_SWITCH":"Y", "SW_AGENT_COLLECTOR_BACKEND_SERVICES": "skywalking-oap.monitoring.svc.cluster.local:11800", "SW_AGENT_OPTS": "-javaagent:./agent/skywalking-agent.jar", "SW_AGENT_SPAN_LIMIT": "200" }
+#parms = { "EUREKA_HOST": "cluster-registry-eureka.pre.svc.cluster.local", "EUREKA_PORT": 8761, "EUREKA_USERNAME": "akso",}
 #envs_config = envs_config(parms)
 #print(envs_config)
 
